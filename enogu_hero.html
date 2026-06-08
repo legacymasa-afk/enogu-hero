@@ -211,6 +211,17 @@ body{font-family:'M PLUS Rounded 1c',sans-serif;color:var(--text);position:fixed
 .modal-handle{width:40px;height:4px;background:var(--muted2);border-radius:2px;margin:0 auto 16px}
 .modal-close{position:absolute;top:14px;right:14px;border:none;background:none;color:var(--muted);font-size:22px;cursor:pointer;padding:4px}
 
+/* ===== SOUND & SAVE ===== */
+.save-img-btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:10px;border:1.5px solid var(--green);border-radius:12px;background:rgba(0,255,163,.08);color:var(--green);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;margin-top:8px;transition:all .2s}
+.save-img-btn:active{background:rgba(0,255,163,.2);transform:scale(.97)}
+.img-viewer{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:300;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:20px}
+.img-viewer.show{display:flex}
+.img-viewer img{max-width:100%;max-height:70vh;border-radius:16px;border:2px solid var(--gold)}
+.img-viewer-name{color:var(--gold);font-family:'Zen Kurenaido',serif;font-size:20px}
+.img-viewer-close{padding:10px 28px;border:none;border-radius:14px;background:var(--card2);color:var(--text);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer}
+.img-viewer-save{padding:10px 28px;border:none;border-radius:14px;background:linear-gradient(135deg,var(--gold2),var(--gold));color:#1A0A00;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer}
+.coll-card-img-btn{position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,.5);border:none;border-radius:8px;color:var(--gold);font-size:14px;cursor:pointer;padding:3px 6px}
+
 /* ===== SPLASH ===== */
 #splash{position:fixed;inset:0;background:var(--bg);z-index:400;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;transition:opacity .5s}
 #splash.out{opacity:0;pointer-events:none}
@@ -291,6 +302,7 @@ body{font-family:'M PLUS Rounded 1c',sans-serif;color:var(--text);position:fixed
           </div>
           <div class="stats-grid" id="statsGrid"></div>
           <div class="story-box" id="storyBox"></div>
+          <button class="save-img-btn" id="saveImgBtn" style="display:none" onclick="openImgViewer()">🖼️ AIイラストをみる・ほぞんする</button>
         </div>
         <div class="card">
           <div class="weapons-section">
@@ -463,6 +475,7 @@ function updateStatusBar(){
 
 // ===== NAVIGATION =====
 function showPage(name){
+  playSound('tap');
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
@@ -598,8 +611,10 @@ SVG_END`;
     renderCharCard(char);
     hideLoading();
     btn.disabled=false;
+    playSound('success');
     btn.textContent='🔄 もういちどつくる';
     document.getElementById('charCard').style.display='block';
+    if(char.aiImageUrl||char.aiSvg) document.getElementById('saveImgBtn').style.display='flex';
     document.getElementById('screen').scrollTo({top:300,behavior:'smooth'});
     // No separate image generation needed - already done!
   } catch(e){
@@ -713,6 +728,7 @@ function closeModal(e){
 
 // ===== COLLECTION =====
 function saveAndGoCollection(){
+  playSound('save');
   if(!currentChar) return;
   updateInCollection(currentChar);
   showPage('collection');
@@ -737,6 +753,7 @@ function renderCollection(){
       ${c.imageData?`<img class="cc-img" src="${c.imageData}" alt="${c.name}">`:`<div class="cc-emoji">${c.emoji||'❓'}</div>`}
       <div class="cc-name">${c.name}</div>
       <div class="cc-info">${c.class} / ${(c.weapons||[]).length}ぶき</div>
+      ${(c.aiImageUrl||c.aiSvg)?`<button class="coll-card-img-btn" onclick="event.stopPropagation();openImgViewerFromCollection(collection[${i}])">🖼️</button>`:''}
     </div>`).join('')}</div>
   <div style="text-align:center;margin-top:12px">
     <button class="btn-secondary" style="max-width:200px;margin:0 auto" onclick="if(confirm('ぜんぶけしますか？'))clearCollection()">🗑️ ぜんぶけす</button>
@@ -776,6 +793,7 @@ function pickCard(p,c,i){
     <div class="bpc-name">${c.name}</div><div class="bpc-class">${c.class}</div></div>`;
 }
 function selectFighter(player,idx){
+  playSound('select');
   if(player===1){
     selectedP1=idx;
     document.querySelectorAll('[id^="pick-1-"]').forEach(el=>el.classList.remove('p1-selected'));
@@ -792,6 +810,7 @@ function calcTotalAtk(char){
 }
 
 async function startBattle(){
+  playSound('battle');
   if(selectedP1===null||selectedP2===null) return;
   const p1=JSON.parse(JSON.stringify(collection[selectedP1]));
   const p2=JSON.parse(JSON.stringify(collection[selectedP2]));
