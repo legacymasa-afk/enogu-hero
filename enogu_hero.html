@@ -245,12 +245,6 @@ body{font-family:'M PLUS Rounded 1c',sans-serif;color:var(--text);position:fixed
       <button class="setup-btn" onclick="saveApiKey()">✅ このキーではじめる！</button>
       <div class="setup-err" id="setupErr">APIキーのかたちがただしくありません</div>
       <a class="setup-link" href="https://console.anthropic.com/" target="_blank">▶ AnthropicAPIキーをとりに行く</a>
-      <div style="margin-top:18px;padding-top:14px;border-top:1px solid rgba(108,62,232,.25)">
-        <h2 style="font-size:14px;color:#4ade80;margin-bottom:6px;font-weight:700">🎨 Gemini APIキー（カラー画像生成・任意）</h2>
-        <p style="font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:10px">GeminiのAPIキーをいれると、とりこんだ絵をAIがカラーのキャラクターにかえてくれます！</p>
-        <input type="password" class="setup-input" id="geminiKeyInput" placeholder="AIza..." autocomplete="off" style="margin-bottom:8px;border-color:rgba(74,222,128,.4)">
-        <a class="setup-link" href="https://aistudio.google.com/apikey" target="_blank" style="color:#4ade80">▶ GeminiAPIキーをとりに行く</a>
-      </div>
       <div class="setup-note">※ キーはこのスマホのブラウザにだけほぞんされます</div>
     </div>
   </div>
@@ -362,7 +356,7 @@ body{font-family:'M PLUS Rounded 1c',sans-serif;color:var(--text);position:fixed
 <script>
 // ===== API KEY MANAGEMENT =====
 let API_KEY = localStorage.getItem('enogu_api_key') || '';
-let GEMINI_KEY = localStorage.getItem('enogu_gemini_key') || '';
+
 let collection = JSON.parse(localStorage.getItem('heroV2') || '[]');
 let currentChar = null, currentImageData = null, cameraStream = null;
 let selectedP1 = null, selectedP2 = null;
@@ -415,12 +409,13 @@ window.addEventListener('load',()=>{
     setTimeout(()=>{
       sp.remove();
       if(API_KEY && API_KEY.startsWith('sk-ant')){
+        // Already have key - go straight to app
         showMainApp();
       } else {
         document.getElementById('apiSetupScreen').style.display='flex';
       }
     },500);
-  },1200);
+  },800);
 });
 
 function togglePw(){
@@ -440,8 +435,7 @@ function saveApiKey(){
   err.style.display='none';
   API_KEY=val;
   localStorage.setItem('enogu_api_key',API_KEY);
-  const gkey=document.getElementById('geminiKeyInput').value.trim();
-  if(gkey){GEMINI_KEY=gkey;localStorage.setItem('enogu_gemini_key',GEMINI_KEY);}
+
   document.getElementById('apiSetupScreen').style.display='none';
   showMainApp();
 }
@@ -596,8 +590,9 @@ async function analyzeCharacter(){
 
 // ===== RENDER CHAR CARD =====
 function renderCharCard(char){
-  document.getElementById('charAvatarWrap').innerHTML=char.imageData
-    ?`<img class="char-avatar" src="${char.imageData}" alt="キャラ">`
+  const dispSrc=char.aiImageUrl||char.imageData;
+  document.getElementById('charAvatarWrap').innerHTML=dispSrc
+    ?`<img class="char-avatar" src="${dispSrc}" alt="キャラ">`
     :`<div class="char-avatar-ph">${char.emoji}</div>`;
   document.getElementById('charName').textContent=char.emoji+' '+char.name;
   document.getElementById('charSub').textContent='【'+char.class+'】 ✨'+char.skill;
@@ -856,38 +851,40 @@ function renderSimpleBattle(p1,p2){
     <button class="btn-primary" style="margin-top:12px" onclick="renderBattleSelect()">🔄 もういちどバトル</button>`;
 }
 
-// ===== AI IMAGE GENERATION (Pollinations - no API key needed) =====
+// ===== AI IMAGE GENERATION =====
 async function generateGeminiImage(char){
   const avatarWrap=document.getElementById('charAvatarWrap');
-  avatarWrap.innerHTML=`<div class="char-avatar-ph">${char.emoji}<br><span style="font-size:10px;color:var(--muted)">🎨 AI生成中…</span></div>`;
-  const prompt=encodeURIComponent(`cute anime RPG character, ${char.name}, ${char.class}, ${char.story}, colorful, full body, white background, game art style, child-friendly illustration, vibrant colors, detailed`);
-  const seed=Math.floor(Math.random()*99999);
-  const url=`https://image.pollinations.ai/prompt/${prompt}?width=512&height=512&seed=${seed}&model=flux&nologo=true`;
+  avatarWrap.innerHTML=`<div class="char-avatar-ph">${char.emoji}<br><span style="font-size:10px;color:var(--muted)">🎨 絵をかいせきちゅう…</span></div>`;
   try{
-    const img=new Image();
-    img.crossOrigin='anonymous';
-    img.onload=function(){
-      try{
-        const canvas=document.createElement('canvas');
-        canvas.width=512;canvas.height=512;
-        canvas.getContext('2d').drawImage(img,0,0,512,512);
-        const imgSrc=canvas.toDataURL('image/jpeg',0.85);
-        char.imageData=imgSrc;
-        avatarWrap.innerHTML=`<img class="char-avatar" src="${imgSrc}" alt="AIキャラ" style="border-color:var(--green)">`;
-        updateInCollection(char);
-      }catch(e){
-        // CORS fallback - just show the URL directly
-        char.imageData=url;
-        avatarWrap.innerHTML=`<img class="char-avatar" src="${url}" alt="AIキャラ" style="border-color:var(--green)">`;
-        updateInCollection(char);
-      }
+    // Step1: Claude describes the drawing faithfully
+    const base64=currentImageData.split(',')[1];
+    const mt=currentImageData.split(';')[0].split(':')[1];
+    const descPrompt=`You are an anime character designer. Look at this child's hand-drawn character sketch carefully. Your job is to write an English image generation prompt that transforms this sketch into a beautiful anime/manga RPG game character illustration. Keep the same character concept, shape, and key features from the drawing, but reimagine it as a polished anime character. Describe: the character's body shape and pose, face features, hair style and color, outfit/armor/costume, any weapons or accessories, special features or unique traits. Make it colorful, exciting and faithful to the original sketch's concept. End the prompt with: anime style, manga illustration, colorful RPG game character, vibrant colors, clean white background, full body shot, high quality digital art, child-friendly, detailed. Return ONLY the image generation prompt, no other text.`;
+    const res=await callAPI({model:'claude-sonnet-4-6',max_tokens:300,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:mt,data:base64}},{type:'text',text:descPrompt}]}]});
+    const data=await res.json();
+    const description=data.content.map(i=>i.text||'').join('').trim();
+    const ph=avatarWrap.querySelector('span');
+    if(ph) ph.textContent='🎨 カラーキャラをせいせいちゅう…';
+    const seed=Math.floor(Math.random()*99999);
+    const url=`https://image.pollinations.ai/prompt/${encodeURIComponent(description)}?width=512&height=512&seed=${seed}&model=flux&nologo=true`;
+    const imgEl=document.createElement('img');
+    imgEl.className='char-avatar';
+    imgEl.style.borderColor='var(--green)';
+    imgEl.alt='AIキャラ';
+    imgEl.onload=function(){
+      char.aiImageUrl=url;
+      avatarWrap.innerHTML='';
+      avatarWrap.appendChild(imgEl);
+      updateInCollection(char);
     };
-    img.onerror=function(){
+    imgEl.onerror=function(){
       avatarWrap.innerHTML=char.imageData?`<img class="char-avatar" src="${char.imageData}" alt="キャラ">`:`<div class="char-avatar-ph">${char.emoji}</div>`;
     };
-    img.src=url;
+    avatarWrap.innerHTML='';
+    avatarWrap.appendChild(imgEl);
+    imgEl.src=url;
   }catch(e){
-    avatarWrap.innerHTML=`<div class="char-avatar-ph">${char.emoji}</div>`;
+    avatarWrap.innerHTML=char.imageData?`<img class="char-avatar" src="${char.imageData}" alt="キャラ">`:`<div class="char-avatar-ph">${char.emoji}</div>`;
   }
 }
 </script>
