@@ -475,7 +475,6 @@ function updateStatusBar(){
 
 // ===== NAVIGATION =====
 function showPage(name){
-  playSound('tap');
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
@@ -611,7 +610,6 @@ SVG_END`;
     renderCharCard(char);
     hideLoading();
     btn.disabled=false;
-    playSound('success');
     btn.textContent='🔄 もういちどつくる';
     document.getElementById('charCard').style.display='block';
     if(char.aiImageUrl||char.aiSvg) document.getElementById('saveImgBtn').style.display='flex';
@@ -728,7 +726,6 @@ function closeModal(e){
 
 // ===== COLLECTION =====
 function saveAndGoCollection(){
-  playSound('save');
   if(!currentChar) return;
   updateInCollection(currentChar);
   showPage('collection');
@@ -793,7 +790,6 @@ function pickCard(p,c,i){
     <div class="bpc-name">${c.name}</div><div class="bpc-class">${c.class}</div></div>`;
 }
 function selectFighter(player,idx){
-  playSound('select');
   if(player===1){
     selectedP1=idx;
     document.querySelectorAll('[id^="pick-1-"]').forEach(el=>el.classList.remove('p1-selected'));
@@ -810,7 +806,6 @@ function calcTotalAtk(char){
 }
 
 async function startBattle(){
-  playSound('battle');
   if(selectedP1===null||selectedP2===null) return;
   const p1=JSON.parse(JSON.stringify(collection[selectedP1]));
   const p2=JSON.parse(JSON.stringify(collection[selectedP2]));
