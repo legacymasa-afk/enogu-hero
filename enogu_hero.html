@@ -852,54 +852,66 @@ function renderSimpleBattle(p1,p2){
     <button class="btn-primary" style="margin-top:12px" onclick="renderBattleSelect()">🔄 もういちどバトル</button>`;
 }
 
-// ===== AI IMAGE GENERATION =====
+// ===== AI IMAGE GENERATION (Claude SVG) =====
 async function generateGeminiImage(char){
   const avatarWrap=document.getElementById('charAvatarWrap');
   avatarWrap.style.position='relative';
   const origSrc=char.imageData;
   avatarWrap.innerHTML=`
     <img class="char-avatar" src="${origSrc}" alt="キャラ" style="opacity:.3">
-    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;background:rgba(0,0,0,.5);border-radius:14px">
-      <div style="font-size:18px">🎨</div>
-      <div style="font-size:9px;color:var(--green);font-weight:700;text-align:center">AI生成中…</div>
+    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;background:rgba(0,0,0,.6);border-radius:14px">
+      <div style="font-size:20px">🎨</div>
+      <div style="font-size:9px;color:var(--green);font-weight:700">AI生成中…</div>
     </div>`;
 
   try{
     const base64=currentImageData.split(',')[1];
     const mt=currentImageData.split(';')[0].split(':')[1];
 
-    // Get description from Claude
-    const descRes=await callAPI({
+    const svgPrompt=`あなたはアニメキャラクターデザイナーです。この手描きキャラクターのスケッチを見て、そのキャラクターを忠実に再現したSVGイラストを作成してください。
+
+要件：
+- 元の絵の特徴（形、シルエット、パーツ）をできるだけ忠実に再現
+- カラフルなアニメ風のキャラクターイラスト
+- SVGサイズは200x200
+- 背景は薄い色のグラデーション
+- キャラクターをカラフルに塗る
+- viewBox="0 0 200 200" を使用
+
+必ずSVGコードのみを返してください。<svg>タグから</svg>タグまでのみ。説明文や\`\`\`は不要。`;
+
+    const res=await callAPI({
       model:'claude-sonnet-4-6',
-      max_tokens:400,
+      max_tokens:2000,
       messages:[{role:'user',content:[
         {type:'image',source:{type:'base64',media_type:mt,data:base64}},
-        {type:'text',text:`Describe this hand-drawn character sketch to recreate it as anime art. Be specific about: body shape, head/face features, hair/head decorations, arms and weapons, legs, any unique traits. Write ONE image generation prompt in English. End with: anime style, colorful RPG game character, vibrant colors, white background, full body, digital illustration. Return ONLY the prompt.`}
+        {type:'text',text:svgPrompt}
       ]}]
     });
-    const descData=await descRes.json();
-    const description=descData.content.map(i=>i.text||'').join('').trim();
-
-    // Try multiple image sources
-    const seed=Math.floor(Math.random()*99999);
-    const encodedPrompt=encodeURIComponent(description);
+    const data=await res.json();
+    let svgCode=data.content.map(i=>i.text||'').join('').trim();
     
-    // Use a reliable image URL
-    const url=`https://image.pollinations.ai/prompt/${encodedPrompt}?width=400&height=400&seed=${seed}&nologo=true`;
+    // Clean up SVG code
+    svgCode=svgCode.replace(/```svg|```xml|```/g,'').trim();
+    if(!svgCode.startsWith('<svg')) {
+      const idx=svgCode.indexOf('<svg');
+      if(idx>=0) svgCode=svgCode.substring(idx);
+    }
+    const endIdx=svgCode.lastIndexOf('</svg>')+6;
+    if(endIdx>5) svgCode=svgCode.substring(0,endIdx);
 
-    // Fetch as blob to avoid CORS/caching issues
-    const imgRes = await fetch(url);
-    if(!imgRes.ok) throw new Error('fetch failed');
-    const blob = await imgRes.blob();
-    const blobUrl = URL.createObjectURL(blob);
+    // Convert SVG to data URL
+    const svgBlob=new Blob([svgCode],{type:'image/svg+xml'});
+    const svgUrl=URL.createObjectURL(svgBlob);
     
-    char.aiImageUrl = blobUrl;
+    char.aiImageUrl=svgUrl;
+    char.aiSvg=svgCode;
     avatarWrap.style.position='';
-    avatarWrap.innerHTML=`<img class="char-avatar" src="${blobUrl}" alt="AIキャラ" style="border-color:var(--green)">`;
+    avatarWrap.innerHTML=`<img class="char-avatar" src="${svgUrl}" alt="AIキャラ" style="border-color:var(--green)">`;
     updateInCollection(char);
 
   }catch(e){
-    console.error('Image gen error:',e);
+    console.error('SVG gen error:',e);
     avatarWrap.style.position='';
     avatarWrap.innerHTML=origSrc
       ?`<img class="char-avatar" src="${origSrc}" alt="キャラ">`
