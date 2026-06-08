@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<title>えのぐヒーロー ⚔️</title>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kurenaido&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --gold:#FFD700;--gold2:#FFA500;
+  --purple:#6C3EE8;--purple2:#9B6BFF;--purple3:#C4A8FF;
+  --bg:#080618;--card:#12103A;--card2:#1C1850;--card3:#251F60;
+  --text:#F0EAFF;--muted:#7A70A8;--muted2:#5A5288;
+  --green:#00FFA3;--red:#FF4D6D;--blue:#5BC8FF;
+  --hp-color:#00FFA3;--atk-color:#FF4D6D;--def-color:#5BC8FF;
+  --spd-color:#FFD700;--mag-color:#CE93D8;--luk-color:#FFB347;
+  --safe-top:env(safe-area-inset-top,0px);
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+}
+html,body{height:100%;overflow:hidden;background:var(--bg)}
+body{font-family:'M PLUS Rounded 1c',sans-serif;color:var(--text);position:fixed;width:100%;height:100%}
+#stars-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0}
+
+/* ===== API KEY SETUP SCREEN ===== */
+#apiSetupScreen{
+  position:fixed;inset:0;z-index:500;
+  background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:24px;gap:0;
+}
+#apiSetupScreen.hidden{display:none}
+.setup-logo{font-family:'Zen Kurenaido',serif;font-size:38px;
+  background:linear-gradient(135deg,var(--gold),var(--purple2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  margin-bottom:6px;text-align:center}
+.setup-sub{color:var(--muted);font-size:13px;margin-bottom:28px;text-align:center;line-height:1.6}
+.setup-card{background:var(--card);border-radius:22px;border:1px solid rgba(108,62,232,.3);padding:20px;width:100%;max-width:400px}
+.setup-card h2{font-size:15px;color:var(--purple3);margin-bottom:6px;font-weight:700}
+.setup-card p{font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:14px}
+.setup-input-wrap{position:relative;margin-bottom:10px}
+.setup-input{
+  width:100%;padding:13px 44px 13px 14px;
+  background:var(--card2);border:1.5px solid rgba(108,62,232,.4);
+  border-radius:14px;color:var(--text);font-family:inherit;font-size:14px;
+  outline:none;transition:border-color .2s;
+}
+.setup-input:focus{border-color:var(--purple2)}
+.setup-input::placeholder{color:var(--muted2)}
+.toggle-pw{
+  position:absolute;right:12px;top:50%;transform:translateY(-50%);
+  background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:4px;
+}
+.setup-btn{
+  width:100%;padding:14px;border:none;border-radius:14px;
+  background:linear-gradient(135deg,var(--gold2),var(--gold));
+  color:#1A0A00;font-family:inherit;font-size:16px;font-weight:900;
+  cursor:pointer;transition:all .2s;margin-top:4px;
+}
+.setup-btn:active{transform:scale(.97)}
+.setup-link{
+  display:block;text-align:center;margin-top:14px;font-size:12px;
+  color:var(--purple3);text-decoration:none;
+}
+.setup-note{font-size:11px;color:var(--muted2);text-align:center;margin-top:10px;line-height:1.6}
+.setup-err{color:var(--red);font-size:12px;text-align:center;margin-top:8px;display:none}
+
+/* ===== MAIN APP ===== */
+#app{position:fixed;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;z-index:1}
+#screen{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:calc(68px + var(--safe-bottom))}
+#nav{
+  position:fixed;bottom:0;left:0;right:0;
+  height:calc(58px + var(--safe-bottom));
+  padding-bottom:var(--safe-bottom);
+  background:rgba(8,6,24,.96);backdrop-filter:blur(20px);
+  border-top:1px solid rgba(108,62,232,.3);display:flex;z-index:100
+}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:none;background:none;color:var(--muted);font-family:inherit;font-size:10px;font-weight:700;cursor:pointer;padding-top:6px;transition:all .2s;position:relative}
+.nav-btn.active{color:var(--purple3)}
+.nav-btn .nav-icon{font-size:21px;line-height:1}
+.nav-btn::after{content:'';position:absolute;bottom:0;left:22%;right:22%;height:2px;background:var(--purple2);border-radius:2px 2px 0 0;transform:scaleX(0);transition:transform .2s}
+.nav-btn.active::after{transform:scaleX(1)}
+
+/* ===== PAGES ===== */
+.page{display:none;padding:12px;min-height:100%}
+.page.active{display:block;animation:pageIn .25s ease}
+@keyframes pageIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* ===== COMMON COMPONENTS ===== */
+.page-title{text-align:center;padding:14px 0 10px;font-family:'Zen Kurenaido',serif;font-size:24px;background:linear-gradient(135deg,var(--gold) 0%,var(--purple2) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.card{background:var(--card);border-radius:18px;border:1px solid rgba(108,62,232,.25);padding:14px;margin-bottom:12px}
+.btn-primary{width:100%;padding:14px;border:none;border-radius:16px;background:linear-gradient(135deg,var(--gold2),var(--gold));color:#1A0A00;font-family:inherit;font-size:16px;font-weight:900;cursor:pointer;transition:all .2s;display:block;text-align:center}
+.btn-primary:active{transform:scale(.97)}
+.btn-primary:disabled{opacity:.5;filter:grayscale(.4)}
+.btn-secondary{width:100%;padding:12px;border:2px solid var(--purple2);border-radius:14px;background:transparent;color:var(--purple3);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:all .2s;margin-bottom:8px}
+.btn-secondary:active{background:rgba(155,107,255,.15)}
+.tag{display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700}
+.tag-ssr{background:linear-gradient(135deg,var(--gold2),var(--gold));color:#1A0A00}
+.tag-sr{background:var(--purple);color:white}
+.tag-r{background:#1A2A4A;color:var(--blue)}
+
+/* ===== CREATE PAGE ===== */
+.upload-zone{border:2px dashed var(--purple2);border-radius:20px;padding:24px 14px;text-align:center;cursor:pointer;background:var(--card);transition:all .3s;touch-action:manipulation}
+.upload-zone:active{border-color:var(--gold);background:var(--card2)}
+.upload-zone .uz-icon{font-size:44px;margin-bottom:8px}
+.upload-zone strong{color:var(--gold);display:block;font-size:15px;margin-bottom:4px}
+.upload-zone p{color:var(--muted);font-size:12px;line-height:1.5}
+.btn-camera{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:12px;border:1px solid rgba(91,200,255,.4);border-radius:14px;background:rgba(91,200,255,.07);color:var(--blue);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;transition:all .2s}
+.btn-camera:active{background:rgba(91,200,255,.18)}
+#previewImg{width:100%;border-radius:16px;border:2px solid var(--purple2);margin-bottom:12px;display:none;max-height:260px;object-fit:cover}
+#videoEl{width:100%;border-radius:16px;display:none;margin-bottom:10px;max-height:240px;object-fit:cover;background:#000}
+#snapBtn{display:none;margin-bottom:8px}
+
+/* ===== CHAR CARD ===== */
+#charCard{display:none}
+.char-header{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.char-avatar{width:72px;height:72px;border-radius:14px;border:2px solid var(--gold);object-fit:cover;flex-shrink:0}
+.char-avatar-ph{width:72px;height:72px;border-radius:14px;border:2px solid var(--purple2);background:var(--card3);display:flex;align-items:center;justify-content:center;font-size:36px;flex-shrink:0}
+.char-name{font-family:'Zen Kurenaido',serif;font-size:20px;color:var(--gold);line-height:1.2}
+.char-sub{font-size:11px;color:var(--purple3);font-weight:700;margin-top:2px}
+.char-lv{font-size:11px;color:var(--muted);margin-top:3px}
+.stats-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:12px}
+.stat-box{background:var(--card2);border-radius:11px;padding:8px 6px;text-align:center}
+.stat-box .sl{font-size:10px;color:var(--muted);margin-bottom:2px}
+.stat-box .sv{font-size:17px;font-weight:900}
+.stat-box .sb{height:4px;border-radius:2px;background:rgba(255,255,255,.1);margin-top:3px;overflow:hidden}
+.stat-box .sb-fill{height:4px;border-radius:2px;transition:width 1.2s cubic-bezier(.22,1,.36,1)}
+.story-box{font-size:12px;color:var(--muted);line-height:1.8;background:var(--card2);border-radius:12px;padding:11px;border-left:3px solid var(--purple2);margin-bottom:12px}
+.weapons-section h3{font-size:13px;color:var(--gold);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.weapon-card{background:var(--card2);border-radius:12px;padding:10px;display:flex;align-items:center;gap:10px;margin-bottom:7px;border:1px solid transparent;transition:all .2s;cursor:pointer}
+.weapon-card:active{border-color:var(--gold);background:var(--card3)}
+.wi-icon{font-size:26px}
+.wi-info .wn{font-size:13px;font-weight:700}
+.wi-info .wd{font-size:10px;color:var(--muted)}
+.wi-info .ws{font-size:10px;color:var(--green)}
+.wi-atk{font-size:18px;font-weight:900;color:var(--red);margin-left:auto}
+.btn-add-weapon{width:100%;padding:10px;border:2px dashed var(--green);border-radius:12px;background:transparent;color:var(--green);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;margin-top:4px;transition:all .2s}
+.btn-add-weapon:active{background:rgba(0,255,163,.08)}
+.weapon-upload-zone{background:var(--card2);border-radius:14px;padding:12px;border:1px solid var(--green);display:none;margin-top:8px}
+.weapon-upload-zone h4{color:var(--green);font-size:13px;margin-bottom:8px}
+.tip-box{text-align:center;padding:20px 14px;color:var(--muted);font-size:13px;line-height:1.8}
+.tip-box strong{color:var(--purple3);display:block;font-size:15px;margin-bottom:6px}
+
+/* ===== SETTINGS IN NAV ===== */
+.api-status-bar{display:flex;align-items:center;justify-content:space-between;background:var(--card2);border-radius:14px;padding:10px 14px;margin-bottom:12px;font-size:12px}
+.api-status-bar .status-dot{width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:6px;display:inline-block}
+.api-status-bar .status-dot.off{background:var(--red)}
+.api-change-btn{font-size:11px;color:var(--purple3);background:none;border:1px solid rgba(155,107,255,.3);border-radius:8px;padding:4px 10px;cursor:pointer;font-family:inherit;font-weight:700}
+
+/* ===== LOADING ===== */
+#loadingOverlay{display:none;position:fixed;inset:0;background:rgba(8,6,24,.92);z-index:200;flex-direction:column;align-items:center;justify-content:center;gap:20px}
+#loadingOverlay.show{display:flex}
+.spinner{width:56px;height:56px;border:3px solid rgba(108,62,232,.3);border-top-color:var(--purple2);border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-msg{color:var(--purple3);font-size:15px;font-weight:700;text-align:center;max-width:220px;line-height:1.6}
+
+/* ===== COLLECTION PAGE ===== */
+.coll-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.coll-card{background:var(--card);border-radius:16px;padding:12px;border:1px solid rgba(108,62,232,.2);cursor:pointer;transition:all .2s;text-align:center;position:relative;overflow:hidden}
+.coll-card:active{transform:scale(.97);border-color:var(--purple2)}
+.coll-card .cc-emoji{font-size:38px;margin-bottom:4px}
+.coll-card .cc-img{width:60px;height:60px;border-radius:10px;object-fit:cover;border:2px solid var(--purple2);margin-bottom:4px}
+.coll-card .cc-name{font-size:13px;font-weight:700;color:var(--text)}
+.coll-card .cc-info{font-size:10px;color:var(--muted);margin-top:2px}
+.coll-card .cc-rarity{position:absolute;top:8px;right:8px}
+.empty-msg{text-align:center;padding:40px 20px;color:var(--muted);font-size:13px;line-height:1.8}
+.empty-msg .em-icon{font-size:48px;display:block;margin-bottom:12px}
+
+/* ===== BATTLE PAGE ===== */
+.battle-select-area h3{font-size:13px;color:var(--gold);margin-bottom:8px;font-weight:700}
+.battle-pick-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.battle-pick-card{background:var(--card2);border-radius:14px;padding:12px;border:2px solid transparent;cursor:pointer;text-align:center;transition:all .2s;min-height:90px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+.battle-pick-card:active{transform:scale(.96)}
+.battle-pick-card.p1-selected{border-color:var(--blue)}
+.battle-pick-card.p2-selected{border-color:var(--red)}
+.battle-pick-card .bpc-img{width:48px;height:48px;border-radius:8px;object-fit:cover;border:1.5px solid var(--purple2)}
+.battle-pick-card .bpc-emoji{font-size:32px}
+.battle-pick-card .bpc-name{font-size:11px;font-weight:700;color:var(--text)}
+.battle-pick-card .bpc-class{font-size:10px;color:var(--muted)}
+.vs-divider{text-align:center;font-family:'Zen Kurenaido',serif;font-size:28px;color:var(--red);margin:8px 0}
+.battle-fighters{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.fighter-panel{background:var(--card2);border-radius:14px;padding:10px;text-align:center}
+.fighter-panel.p1{border:1.5px solid var(--blue)}
+.fighter-panel.p2{border:1.5px solid var(--red)}
+.fp-name{font-size:12px;font-weight:700;color:var(--text);margin-bottom:4px}
+.fp-img{width:52px;height:52px;border-radius:10px;object-fit:cover;margin:0 auto 4px;border:1.5px solid var(--purple2)}
+.fp-emoji{font-size:34px;margin-bottom:4px}
+.fp-hp-bar{height:8px;border-radius:4px;background:rgba(255,255,255,.1);overflow:hidden;margin:4px 0}
+.fp-hp-fill{height:8px;border-radius:4px;background:var(--green);transition:width .6s ease}
+.fp-hp-text{font-size:11px;color:var(--green);font-weight:700}
+.battle-log{background:var(--card);border-radius:14px;padding:12px;max-height:200px;overflow-y:auto;margin-bottom:12px;border:1px solid rgba(108,62,232,.2)}
+.battle-log h4{font-size:12px;color:var(--gold);margin-bottom:8px;font-weight:700}
+.log-entry{font-size:12px;color:var(--muted);line-height:1.7;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.log-entry.atk{color:var(--red)}
+.log-entry.def{color:var(--blue)}
+.log-entry.special{color:var(--gold)}
+#battleResult{display:none;text-align:center;padding:16px;background:var(--card2);border-radius:16px;margin-bottom:12px;border:2px solid var(--gold)}
+.result-name{font-family:'Zen Kurenaido',serif;font-size:22px;color:var(--gold)}
+.result-sub{font-size:13px;color:var(--muted);margin-top:4px}
+.hit-flash{animation:hitFlash .3s ease}
+@keyframes hitFlash{0%,100%{opacity:1}50%{opacity:.15}}
+
+/* ===== MODAL ===== */
+#modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:150;align-items:flex-end;justify-content:center}
+#modal.show{display:flex}
+.modal-content{background:var(--card);border-radius:24px 24px 0 0;padding:20px;width:100%;max-height:70vh;overflow-y:auto;animation:slideUp .25s ease;padding-bottom:calc(20px + var(--safe-bottom))}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal-handle{width:40px;height:4px;background:var(--muted2);border-radius:2px;margin:0 auto 16px}
+.modal-close{position:absolute;top:14px;right:14px;border:none;background:none;color:var(--muted);font-size:22px;cursor:pointer;padding:4px}
+
+/* ===== SOUND & SAVE ===== */
+.save-img-btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:10px;border:1.5px solid var(--green);border-radius:12px;background:rgba(0,255,163,.08);color:var(--green);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;margin-top:8px;transition:all .2s}
+.save-img-btn:active{background:rgba(0,255,163,.2);transform:scale(.97)}
+.img-viewer{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:300;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:20px}
+.img-viewer.show{display:flex}
+.img-viewer img{max-width:100%;max-height:70vh;border-radius:16px;border:2px solid var(--gold)}
+.img-viewer-name{color:var(--gold);font-family:'Zen Kurenaido',serif;font-size:20px}
+.img-viewer-close{padding:10px 28px;border:none;border-radius:14px;background:var(--card2);color:var(--text);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer}
+.img-viewer-save{padding:10px 28px;border:none;border-radius:14px;background:linear-gradient(135deg,var(--gold2),var(--gold));color:#1A0A00;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer}
+.coll-card-img-btn{position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,.5);border:none;border-radius:8px;color:var(--gold);font-size:14px;cursor:pointer;padding:3px 6px}
+
+/* ===== SPLASH ===== */
+#splash{position:fixed;inset:0;background:var(--bg);z-index:400;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;transition:opacity .5s}
+#splash.out{opacity:0;pointer-events:none}
+.splash-title{font-family:'Zen Kurenaido',serif;font-size:38px;background:linear-gradient(135deg,var(--gold),var(--purple2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:pulse 2s ease infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.7}}
+.splash-sub{color:var(--muted);font-size:13px}
+.splash-sp{width:36px;height:36px;border:3px solid rgba(255,215,0,.2);border-top-color:var(--gold);border-radius:50%;animation:spin 1s linear infinite}
+</style>
+</head>
+<body>
+
+<!-- SPLASH -->
+<div id="splash">
+  <div class="splash-title">⚔️ えのぐヒーロー</div>
+  <div class="splash-sub">きみの絵がつよくなる！</div>
+  <div class="splash-sp"></div>
+</div>
+
+<!-- API KEY SETUP SCREEN -->
+<div id="apiSetupScreen">
+  <canvas id="stars-canvas2" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none"></canvas>
+  <div style="position:relative;z-index:1;width:100%;max-width:400px">
+    <div class="setup-logo">⚔️ えのぐヒーロー</div>
+    <div class="setup-sub">きみの絵がつよいキャラになる！<br>はじめにAPIキーをせっていしよう</div>
+    <div class="setup-card">
+      <h2>🔑 Anthropic APIキー</h2>
+      <p>このアプリはAIをつかっています。<br>保護者の方がAPIキーを入力してください。<br>キーはこのスマホにのみ保存されます。</p>
+      <div class="setup-input-wrap">
+        <input type="password" class="setup-input" id="apiKeyInput" placeholder="sk-ant-api03-..." autocomplete="off" autocorrect="off" spellcheck="false">
+        <button class="toggle-pw" onclick="togglePw()" id="togglePwBtn">👁️</button>
+      </div>
+      <button class="setup-btn" onclick="saveApiKey()">✅ このキーではじめる！</button>
+      <div class="setup-err" id="setupErr">APIキーのかたちがただしくありません</div>
+      <a class="setup-link" href="https://console.anthropic.com/" target="_blank">▶ AnthropicAPIキーをとりに行く</a>
+      <div class="setup-note">※ キーはこのスマホのブラウザにだけほぞんされます</div>
+    </div>
+  </div>
+</div>
+
+<canvas id="stars-canvas"></canvas>
+
+<!-- MAIN APP -->
+<div id="app" style="display:none">
+  <div id="screen">
+
+    <!-- CREATE PAGE -->
+    <div class="page active" id="page-create">
+      <div class="page-title">✏️ キャラをつくる</div>
+      <div class="api-status-bar">
+        <span><span class="status-dot" id="statusDot"></span><span id="statusText">APIキー：せってい済み ✅</span></span>
+        <button class="api-change-btn" onclick="changeApiKey()">変更</button>
+      </div>
+      <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
+        <div class="uz-icon">🎨</div>
+        <strong>えをとりこもう！</strong>
+        <p>タップして写真をえらぶ</p>
+      </div>
+      <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="handleFile(event)">
+      <button class="btn-camera" onclick="toggleCamera()">📷 カメラでとる</button>
+      <video id="videoEl" autoplay playsinline muted></video>
+      <button class="btn-primary" id="snapBtn" onclick="snapPhoto()">📸 シャッター！</button>
+      <canvas id="snapCanvas" style="display:none"></canvas>
+      <img id="previewImg" alt="とりこんだ絵">
+      <button class="btn-primary" id="analyzeBtn" style="display:none" onclick="analyzeCharacter()">🔮 キャラクターをつくる！</button>
+      <div class="tip-box" id="tipBox">
+        <strong>🌟 あそびかた</strong>
+        じぶんでかいたキャラクターの絵を<br>カメラでとるか、写真をえらぼう！<br>AIがつよいキャラクターにしてくれるよ✨
+      </div>
+      <div id="charCard">
+        <div class="card">
+          <div class="char-header">
+            <div id="charAvatarWrap"></div>
+            <div>
+              <div class="char-name" id="charName"></div>
+              <div class="char-sub" id="charSub"></div>
+              <div class="char-lv">Lv.1 &nbsp;<span class="tag" id="charRarity"></span></div>
+            </div>
+          </div>
+          <div class="stats-grid" id="statsGrid"></div>
+          <div class="story-box" id="storyBox"></div>
+          <button class="save-img-btn" id="saveImgBtn" style="display:none" onclick="openImgViewer()">🖼️ AIイラストをみる・ほぞんする</button>
+        </div>
+        <div class="card">
+          <div class="weapons-section">
+            <h3>⚔️ ぶき・どうぐ <span id="wCount" style="font-size:11px;background:var(--purple);padding:1px 8px;border-radius:12px;color:white">0</span></h3>
+            <div id="weaponList"></div>
+            <button class="btn-add-weapon" onclick="showWeaponUpload()">＋ ぶきをかいてくわえる！</button>
+            <div class="weapon-upload-zone" id="weaponUploadZone">
+              <h4>🗡️ ぶきの絵をとりこもう</h4>
+              <div class="upload-zone" style="padding:16px" onclick="document.getElementById('weaponInput').click()">
+                <div class="uz-icon" style="font-size:32px">🖊️</div>
+                <p style="font-size:12px">かいたぶきの写真をえらぶ</p>
+              </div>
+              <input type="file" id="weaponInput" accept="image/*" style="display:none" onchange="handleWeaponFile(event)">
+            </div>
+          </div>
+        </div>
+        <button class="btn-secondary" onclick="saveAndGoCollection()">💾 図鑑にほぞんする</button>
+      </div>
+    </div>
+
+    <!-- COLLECTION PAGE -->
+    <div class="page" id="page-collection">
+      <div class="page-title">📖 キャラ図鑑</div>
+      <div id="collContent"></div>
+    </div>
+
+    <!-- BATTLE PAGE -->
+    <div class="page" id="page-battle">
+      <div class="page-title">⚔️ バトル！</div>
+      <div id="battleContent"></div>
+    </div>
+
+  </div>
+
+  <nav id="nav">
+    <button class="nav-btn active" id="nav-create" onclick="showPage('create')">
+      <span class="nav-icon">✏️</span>つくる
+    </button>
+    <button class="nav-btn" id="nav-collection" onclick="showPage('collection')">
+      <span class="nav-icon">📖</span>図鑑
+    </button>
+    <button class="nav-btn" id="nav-battle" onclick="showPage('battle')">
+      <span class="nav-icon">⚔️</span>バトル
+    </button>
+  </nav>
+</div>
+
+<!-- LOADING -->
+<div id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="loading-msg" id="loadingMsg">✨ キャラクターをよびだしています…</div>
+</div>
+
+<!-- MODAL -->
+<div id="modal" onclick="closeModal(event)">
+  <div class="modal-content">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+// ===== API KEY MANAGEMENT =====
+let API_KEY = localStorage.getItem('enogu_api_key') || '';
+
+let collection = JSON.parse(localStorage.getItem('heroV2') || '[]');
+let currentChar = null, currentImageData = null, cameraStream = null;
+let selectedP1 = null, selectedP2 = null;
+
+const LOADING_MSGS = [
+  "✨ キャラクターをよびだしています…",
+  "⚔️ ステータスをけいさんちゅう…",
+  "🔮 まほうをかけています…",
+  "🌟 キャラクターがめざめます…",
+  "💫 ちからをはかっています…"
+];
+
+// Stars animation (shared between screens)
+function initStars(canvasId){
+  const c = document.getElementById(canvasId);
+  if(!c) return;
+  const ctx = c.getContext('2d');
+  let W, H, stars = [];
+  function resize(){
+    W = c.width = c.parentElement ? c.parentElement.offsetWidth : window.innerWidth;
+    H = c.height = c.parentElement ? c.parentElement.offsetHeight : window.innerHeight;
+    if(canvasId==='stars-canvas'){W=window.innerWidth;H=window.innerHeight;}
+    stars = Array.from({length:50},()=>({
+      x:Math.random()*W, y:Math.random()*H,
+      r:Math.random()*1.4+.3,
+      t:Math.random()*Math.PI*2,
+      s:Math.random()*.02+.005
+    }));
+  }
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    stars.forEach(s=>{
+      s.t+=s.s;
+      ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+      ctx.fillStyle=`rgba(255,255,255,${.3+.7*Math.abs(Math.sin(s.t))})`;ctx.fill();
+    });
+    requestAnimationFrame(draw);
+  }
+  resize(); draw();
+  window.addEventListener('resize',resize);
+}
+initStars('stars-canvas');
+initStars('stars-canvas2');
+
+// ===== SPLASH + INIT =====
+window.addEventListener('load',()=>{
+  setTimeout(()=>{
+    const sp=document.getElementById('splash');
+    sp.classList.add('out');
+    setTimeout(()=>{
+      sp.remove();
+      if(API_KEY && API_KEY.startsWith('sk-ant')){
+        // Already have key - go straight to app
+        showMainApp();
+      } else {
+        document.getElementById('apiSetupScreen').style.display='flex';
+      }
+    },500);
+  },800);
+});
+
+function togglePw(){
+  const inp=document.getElementById('apiKeyInput');
+  const btn=document.getElementById('togglePwBtn');
+  if(inp.type==='password'){inp.type='text';btn.textContent='🙈';}
+  else{inp.type='password';btn.textContent='👁️';}
+}
+
+function saveApiKey(){
+  const val=document.getElementById('apiKeyInput').value.trim();
+  const err=document.getElementById('setupErr');
+  if(!val.startsWith('sk-ant')){
+    err.style.display='block';
+    return;
+  }
+  err.style.display='none';
+  API_KEY=val;
+  localStorage.setItem('enogu_api_key',API_KEY);
+
+  document.getElementById('apiSetupScreen').style.display='none';
+  showMainApp();
+}
+
+function showMainApp(){
+  document.getElementById('app').style.display='flex';
+  updateStatusBar();
+}
+
+function changeApiKey(){
+  API_KEY='';
+  localStorage.removeItem('enogu_api_key');
+  document.getElementById('app').style.display='none';
+  const screen=document.getElementById('apiSetupScreen');
+  screen.style.display='flex';
+  document.getElementById('apiKeyInput').value='';
+  document.getElementById('apiKeyInput').type='password';
+  document.getElementById('togglePwBtn').textContent='👁️';
+}
+
+function updateStatusBar(){
+  document.getElementById('statusDot').className='status-dot'+(API_KEY?'':' off');
+  document.getElementById('statusText').textContent=API_KEY?'APIキー：せってい済み ✅':'APIキー：みせってい ❌';
+}
+
+// ===== NAVIGATION =====
+function showPage(name){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  document.getElementById('nav-'+name).classList.add('active');
+  document.getElementById('screen').scrollTo(0,0);
+  if(name==='collection') renderCollection();
+  if(name==='battle') renderBattleSelect();
+}
+
+// ===== API CALL HELPER =====
+async function callAPI(body){
+  if(!API_KEY){changeApiKey();throw new Error('no key');}
+  const res = await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'x-api-key': API_KEY,
+      'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true'
+    },
+    body:JSON.stringify(body)
+  });
+  if(!res.ok){
+    const err = await res.json().catch(()=>({}));
+    throw new Error(err?.error?.message||'API error '+res.status);
+  }
+  return res;
+}
+
+// ===== FILE / CAMERA =====
+function handleFile(e){
+  const f=e.target.files[0]; if(!f) return;
+  stopCamera();
+  const r=new FileReader();
+  r.onload=ev=>{currentImageData=ev.target.result;showPreview(currentImageData);};
+  r.readAsDataURL(f);
+  e.target.value='';
+}
+
+function showPreview(src){
+  const img=document.getElementById('previewImg');
+  img.src=src; img.style.display='block';
+  document.getElementById('analyzeBtn').style.display='block';
+  document.getElementById('tipBox').style.display='none';
+  document.getElementById('charCard').style.display='none';
+}
+
+function toggleCamera(){
+  if(cameraStream){stopCamera();return;}
+  navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1280}},audio:false})
+    .then(s=>{
+      cameraStream=s;
+      const v=document.getElementById('videoEl');
+      v.srcObject=s; v.style.display='block';
+      document.getElementById('snapBtn').style.display='block';
+    })
+    .catch(()=>alert('カメラをつかえませんでした。写真をえらんでね！'));
+}
+
+function stopCamera(){
+  if(cameraStream){cameraStream.getTracks().forEach(t=>t.stop());cameraStream=null;}
+  document.getElementById('videoEl').style.display='none';
+  document.getElementById('snapBtn').style.display='none';
+}
+
+function snapPhoto(){
+  const v=document.getElementById('videoEl');
+  const c=document.getElementById('snapCanvas');
+  c.width=v.videoWidth; c.height=v.videoHeight;
+  c.getContext('2d').drawImage(v,0,0);
+  currentImageData=c.toDataURL('image/jpeg',.85);
+  showPreview(currentImageData);
+  stopCamera();
+}
+
+// ===== LOADING =====
+let loadInterval;
+function showLoading(msg){
+  let i=0;
+  const el=document.getElementById('loadingMsg');
+  el.textContent=msg||LOADING_MSGS[0];
+  if(!msg) loadInterval=setInterval(()=>{el.textContent=LOADING_MSGS[++i%LOADING_MSGS.length];},1500);
+  document.getElementById('loadingOverlay').classList.add('show');
+}
+function hideLoading(){clearInterval(loadInterval);document.getElementById('loadingOverlay').classList.remove('show');}
+
+// ===== ANALYZE CHARACTER =====
+async function analyzeCharacter(){
+  if(!currentImageData) return;
+  if(!API_KEY){alert('APIキーをせっていしてね！');changeApiKey();return;}
+  const btn=document.getElementById('analyzeBtn');
+  btn.disabled=true; showLoading();
+  const base64=currentImageData.split(',')[1];
+  const mt=currentImageData.split(';')[0].split(':')[1];
+  const prompt=`あなたはRPGゲームのキャラクタークリエイターかつSVGアーティストです。子供が描いたキャラクターの画像を見て、以下を作成してください。
+
+1. キャラクターのRPGステータス（JSON）
+2. そのキャラクターを元の絵に忠実に再現したカラフルなアニメ風SVGイラスト（200x200）
+
+必ず以下の形式のみで返答してください（コードブロックなし）:
+
+JSON_START
+{"name":"キャラクター名（8文字以内）","class":"職業","rarity":"SSR|SR|R","hp":数値(100-999),"atk":数値(10-99),"def":数値(10-99),"spd":数値(10-99),"mag":数値(10-99),"luk":数値(10-99),"story":"紹介（45文字以内）","skill":"とくぎ名（15文字以内）","skillDesc":"説明（20文字以内）","emoji":"絵文字1つ","startingWeapon":{"name":"ぶき名","emoji":"絵文字","atk":数値(5-25),"desc":"説明（20文字以内）"}}
+JSON_END
+SVG_START
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+（元の絵のキャラクターをカラフルなアニメ風で忠実に再現。背景はグラデーション。キャラクターの特徴的な形・シルエットを保持。鮮やかな色使い。200x200に収める）
+</svg>
+SVG_END`;
+  try {
+    const res=await callAPI({model:'claude-sonnet-4-6',max_tokens:3000,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:mt,data:base64}},{type:'text',text:prompt}]}]});
+    const data=await res.json();
+    const text=data.content.map(i=>i.text||'').join('');
+    
+    // Extract JSON
+    const jsonMatch=text.match(/JSON_START\s*([\s\S]*?)\s*JSON_END/);
+    if(!jsonMatch) throw new Error('JSON not found');
+    const char=JSON.parse(jsonMatch[1].trim());
+    
+    // Extract SVG
+    const svgMatch=text.match(/SVG_START\s*([\s\S]*?)\s*SVG_END/);
+    if(svgMatch){
+      const svgCode=svgMatch[1].trim();
+      const svgBlob=new Blob([svgCode],{type:'image/svg+xml'});
+      char.aiImageUrl=URL.createObjectURL(svgBlob);
+      char.aiSvg=svgCode;
+    }
+    
+    char.imageData=currentImageData;
+    char.weapons=[char.startingWeapon];
+    char.id=Date.now().toString();
+    currentChar=char;
+    renderCharCard(char);
+    hideLoading();
+    btn.disabled=false;
+    btn.textContent='🔄 もういちどつくる';
+    document.getElementById('charCard').style.display='block';
+    if(char.aiImageUrl||char.aiSvg) document.getElementById('saveImgBtn').style.display='flex';
+    document.getElementById('screen').scrollTo({top:300,behavior:'smooth'});
+    // No separate image generation needed - already done!
+  } catch(e){
+    hideLoading();btn.disabled=false;
+    if(e.message==='no key') return;
+    if(e.message&&e.message.includes('401')||e.message&&e.message.includes('invalid')){
+      changeApiKey();
+    } else {
+      document.getElementById('tipBox').style.display='block';
+      document.getElementById('tipBox').innerHTML='<strong>⚠️ エラー</strong>もういちどためしてね！<br><small style="color:var(--muted2)">'+e.message+'</small>';
+    }
+  }
+}
+
+// ===== RENDER CHAR CARD =====
+function renderCharCard(char){
+  const dispSrc=char.aiImageUrl||char.imageData;
+  document.getElementById('charAvatarWrap').style.position='';
+  if(char.aiSvg && !char.aiImageUrl){
+    const svgBlob=new Blob([char.aiSvg],{type:'image/svg+xml'});
+    char.aiImageUrl=URL.createObjectURL(svgBlob);
+  }
+  const finalSrc=char.aiImageUrl||char.imageData;
+  document.getElementById('charAvatarWrap').innerHTML=finalSrc
+    ?`<img class="char-avatar" src="${finalSrc}" alt="キャラ">`
+    :`<div class="char-avatar-ph">${char.emoji}</div>`;
+  document.getElementById('charName').textContent=char.emoji+' '+char.name;
+  document.getElementById('charSub').textContent='【'+char.class+'】 ✨'+char.skill;
+  const rt=document.getElementById('charRarity');
+  rt.textContent=char.rarity;
+  rt.className='tag tag-'+char.rarity.toLowerCase();
+  const stats=[
+    {k:'HP',v:char.hp,max:999,c:'var(--hp-color)'},
+    {k:'こうげき',v:char.atk,max:99,c:'var(--atk-color)'},
+    {k:'ぼうぎょ',v:char.def,max:99,c:'var(--def-color)'},
+    {k:'すばやさ',v:char.spd,max:99,c:'var(--spd-color)'},
+    {k:'まほう',v:char.mag,max:99,c:'var(--mag-color)'},
+    {k:'うん',v:char.luk,max:99,c:'var(--luk-color)'},
+  ];
+  document.getElementById('statsGrid').innerHTML=stats.map(s=>`
+    <div class="stat-box"><div class="sl">${s.k}</div><div class="sv" style="color:${s.c}">${s.v}</div>
+    <div class="sb"><div class="sb-fill" style="width:0%;background:${s.c}" data-pct="${Math.min(100,(s.v/s.max)*100).toFixed(1)}"></div></div></div>`).join('');
+  setTimeout(()=>document.querySelectorAll('.sb-fill').forEach(el=>{el.style.width=el.dataset.pct+'%'}),50);
+  document.getElementById('storyBox').textContent=char.story;
+  renderWeapons(char.weapons||[]);
+}
+
+function renderWeapons(weapons){
+  document.getElementById('weaponList').innerHTML=weapons.map((w,i)=>`
+    <div class="weapon-card" onclick="showWeaponModal(${i})">
+      <span class="wi-icon">${w.emoji}</span>
+      <div class="wi-info"><div class="wn">${w.name}</div><div class="wd">${w.desc||''}</div>${w.special?`<div class="ws">✨ ${w.special}</div>`:''}</div>
+      <div class="wi-atk">+${w.atk}</div>
+    </div>`).join('');
+  document.getElementById('wCount').textContent=weapons.length;
+}
+
+// ===== WEAPON ADD =====
+function showWeaponUpload(){
+  const z=document.getElementById('weaponUploadZone');
+  z.style.display=z.style.display==='block'?'none':'block';
+}
+
+async function handleWeaponFile(e){
+  const f=e.target.files[0]; if(!f||!currentChar) return;
+  e.target.value='';
+  showLoading('🗡️ ぶきをかいせきちゅう…');
+  const r=new FileReader();
+  r.onload=async ev=>{
+    const wdata=ev.target.result;
+    const base64=wdata.split(',')[1];
+    const mt=wdata.split(';')[0].split(':')[1];
+    const prompt=`子供が描いた武器・道具の絵を見て、RPGゲーム用にJSON形式でデータを作成してください。キャラクター「${currentChar.name}」(${currentChar.class})が使うものとして考えてください。
+必ずこのJSON形式のみで返答してください（コードブロックなし）:
+{"name":"ぶき・どうぐ名（12文字以内）","emoji":"合う絵文字1つ","atk":数値(15-50),"desc":"説明（20文字以内、子供向け）","special":"とくしゅこうか名（15文字以内）"}`;
+    try {
+      const res=await callAPI({model:'claude-sonnet-4-6',max_tokens:300,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:mt,data:base64}},{type:'text',text:prompt}]}]});
+      const data=await res.json();
+      const text=data.content.map(i=>i.text||'').join('');
+      const weapon=JSON.parse(text.replace(/```json|```/g,'').trim());
+      currentChar.weapons.push(weapon);
+      renderWeapons(currentChar.weapons);
+      document.getElementById('weaponUploadZone').style.display='none';
+      updateInCollection(currentChar);
+      hideLoading();
+    } catch(e){hideLoading();}
+  };
+  r.readAsDataURL(f);
+}
+
+// ===== WEAPON MODAL =====
+function showWeaponModal(idx){
+  if(!currentChar||!currentChar.weapons[idx]) return;
+  const w=currentChar.weapons[idx];
+  document.getElementById('modalBody').innerHTML=`
+    <div style="text-align:center;margin-bottom:14px">
+      <div style="font-size:52px">${w.emoji}</div>
+      <div style="font-family:'Zen Kurenaido',serif;font-size:22px;color:var(--gold);margin-top:6px">${w.name}</div>
+    </div>
+    <div style="display:flex;justify-content:center;gap:24px;margin-bottom:14px">
+      <div style="text-align:center"><div style="font-size:11px;color:var(--muted)">こうげきアップ</div><div style="font-size:28px;font-weight:900;color:var(--red)">+${w.atk}</div></div>
+      ${w.special?`<div style="text-align:center"><div style="font-size:11px;color:var(--muted)">とくしゅこうか</div><div style="font-size:13px;font-weight:700;color:var(--green);margin-top:6px">${w.special}</div></div>`:''}
+    </div>
+    <div style="font-size:13px;color:var(--muted);text-align:center;line-height:1.7">${w.desc||''}</div>`;
+  document.getElementById('modal').classList.add('show');
+}
+function closeModal(e){
+  if(!e||e.target===document.getElementById('modal'))
+    document.getElementById('modal').classList.remove('show');
+}
+
+// ===== COLLECTION =====
+function saveAndGoCollection(){
+  if(!currentChar) return;
+  updateInCollection(currentChar);
+  showPage('collection');
+}
+function updateInCollection(char){
+  // Save a copy without blob URLs (they don't persist)
+  const toSave={...char};
+  if(toSave.aiImageUrl && toSave.aiImageUrl.startsWith('blob:')) delete toSave.aiImageUrl;
+  const idx=collection.findIndex(c=>c.id===toSave.id);
+  if(idx>=0) collection[idx]=toSave; else collection.unshift(toSave);
+  if(collection.length>30) collection=collection.slice(0,30);
+  localStorage.setItem('heroV2',JSON.stringify(collection));
+}
+function renderCollection(){
+  const el=document.getElementById('collContent');
+  if(collection.length===0){
+    el.innerHTML=`<div class="empty-msg"><span class="em-icon">📖</span>まだキャラクターがいないよ！<br>✏️「つくる」タブでさいしょのキャラをつくろう！</div>`;return;
+  }
+  el.innerHTML=`<div class="coll-grid">${collection.map((c,i)=>`
+    <div class="coll-card" onclick="loadCharFromCollection(${i})">
+      <span class="cc-rarity tag tag-${c.rarity.toLowerCase()}">${c.rarity}</span>
+      ${c.imageData?`<img class="cc-img" src="${c.imageData}" alt="${c.name}">`:`<div class="cc-emoji">${c.emoji||'❓'}</div>`}
+      <div class="cc-name">${c.name}</div>
+      <div class="cc-info">${c.class} / ${(c.weapons||[]).length}ぶき</div>
+      ${(c.aiImageUrl||c.aiSvg)?`<button class="coll-card-img-btn" onclick="event.stopPropagation();openImgViewerFromCollection(collection[${i}])">🖼️</button>`:''}
+    </div>`).join('')}</div>
+  <div style="text-align:center;margin-top:12px">
+    <button class="btn-secondary" style="max-width:200px;margin:0 auto" onclick="if(confirm('ぜんぶけしますか？'))clearCollection()">🗑️ ぜんぶけす</button>
+  </div>`;
+}
+function loadCharFromCollection(i){
+  currentChar=collection[i]; currentImageData=collection[i].imageData;
+  showPage('create');
+  if(currentImageData) showPreview(currentImageData);
+  document.getElementById('analyzeBtn').style.display='block';
+  document.getElementById('analyzeBtn').textContent='🔄 もういちどつくる';
+  document.getElementById('charCard').style.display='block';
+  renderCharCard(collection[i]);
+}
+function clearCollection(){collection=[];localStorage.setItem('heroV2','[]');renderCollection();}
+
+// ===== BATTLE =====
+function renderBattleSelect(){
+  selectedP1=null; selectedP2=null;
+  const el=document.getElementById('battleContent');
+  if(collection.length<2){
+    el.innerHTML=`<div class="empty-msg"><span class="em-icon">⚔️</span>バトルにはキャラが2体ひつよう！<br>✏️「つくる」タブでキャラをつくってほぞんしよう！</div>`;return;
+  }
+  el.innerHTML=`
+    <div class="battle-select-area">
+      <h3>🔵 1Pのキャラをえらぼう</h3>
+      <div class="battle-pick-grid">${collection.map((c,i)=>pickCard(1,c,i)).join('')}</div>
+      <div class="vs-divider">VS</div>
+      <h3>🔴 2Pのキャラをえらぼう</h3>
+      <div class="battle-pick-grid">${collection.map((c,i)=>pickCard(2,c,i)).join('')}</div>
+    </div>
+    <button class="btn-primary" id="battleStartBtn" style="display:none" onclick="startBattle()">⚔️ バトルかいし！</button>`;
+}
+function pickCard(p,c,i){
+  return `<div class="battle-pick-card" id="pick-${p}-${i}" onclick="selectFighter(${p},${i})">
+    ${c.imageData?`<img class="bpc-img" src="${c.imageData}" alt="${c.name}">`:`<div class="bpc-emoji">${c.emoji||'❓'}</div>`}
+    <div class="bpc-name">${c.name}</div><div class="bpc-class">${c.class}</div></div>`;
+}
+function selectFighter(player,idx){
+  if(player===1){
+    selectedP1=idx;
+    document.querySelectorAll('[id^="pick-1-"]').forEach(el=>el.classList.remove('p1-selected'));
+    document.getElementById('pick-1-'+idx).classList.add('p1-selected');
+  } else {
+    selectedP2=idx;
+    document.querySelectorAll('[id^="pick-2-"]').forEach(el=>el.classList.remove('p2-selected'));
+    document.getElementById('pick-2-'+idx).classList.add('p2-selected');
+  }
+  if(selectedP1!==null&&selectedP2!==null) document.getElementById('battleStartBtn').style.display='block';
+}
+function calcTotalAtk(char){
+  return char.atk+Math.floor((char.weapons||[]).reduce((s,w)=>s+(w.atk||0),0)*0.5);
+}
+
+async function startBattle(){
+  if(selectedP1===null||selectedP2===null) return;
+  const p1=JSON.parse(JSON.stringify(collection[selectedP1]));
+  const p2=JSON.parse(JSON.stringify(collection[selectedP2]));
+  if(p1.id===p2.id){alert('ちがうキャラをえらんでね！');return;}
+  p1.totalAtk=calcTotalAtk(p1); p2.totalAtk=calcTotalAtk(p2);
+  showLoading('⚔️ バトルをシミュレートちゅう…');
+  const prompt=`2つのRPGキャラクターがバトルします。ターン制で戦闘をシミュレートし、結果をJSONで返してください。
+キャラ1: ${p1.name} (${p1.class}) HP:${p1.hp} ATK:${p1.totalAtk} DEF:${p1.def} SPD:${p1.spd} MAG:${p1.mag} LUK:${p1.luk}
+ぶき: ${(p1.weapons||[]).map(w=>w.name+'(+'+w.atk+')').join(',')}
+とくぎ: ${p1.skill}
+
+キャラ2: ${p2.name} (${p2.class}) HP:${p2.hp} ATK:${p2.totalAtk} DEF:${p2.def} SPD:${p2.spd} MAG:${p2.mag} LUK:${p2.luk}
+ぶき: ${(p2.weapons||[]).map(w=>w.name+'(+'+w.atk+')').join(',')}
+とくぎ: ${p2.skill}
+
+ルール: すばやさ高い方が先攻。ダメージ=(ATK-DEF/2)*乱数(0.8-1.2)、最低5。とくぎはランダムで発動(1.8倍)。どちらかHP0以下で終了(最大6ターン)。
+
+必ずこのJSON形式のみで返答（コードブロックなし）:
+{"turns":[{"turn":1,"attacker":"p1","action":"ふつうこうげき","actionName":"こうどう名","damage":数値,"p1Hp":数値,"p2Hp":数値,"description":"25文字以内のせつめい"}],"winner":"p1","finalMessage":"30文字以内のしょうりメッセージ"}`;
+  try {
+    const res=await callAPI({model:'claude-sonnet-4-6',max_tokens:1500,messages:[{role:'user',content:prompt}]});
+    const data=await res.json();
+    const text=data.content.map(i=>i.text||'').join('');
+    const result=JSON.parse(text.replace(/```json|```/g,'').trim());
+    hideLoading();
+    renderBattleAnimation(p1,p2,result);
+  } catch(e){hideLoading();renderSimpleBattle(p1,p2);}
+}
+
+function renderBattleAnimation(p1,p2,result){
+  const el=document.getElementById('battleContent');
+  el.innerHTML=`
+    <div class="battle-fighters">
+      <div class="fighter-panel p1" id="fp1">
+        <div class="fp-name">🔵 ${p1.name}</div>
+        ${p1.imageData?`<img class="fp-img" src="${p1.imageData}" alt="${p1.name}">`:`<div class="fp-emoji">${p1.emoji}</div>`}
+        <div class="fp-hp-bar"><div class="fp-hp-fill" id="hp1bar" style="width:100%"></div></div>
+        <div class="fp-hp-text" id="hp1text">${p1.hp} / ${p1.hp}</div>
+      </div>
+      <div class="fighter-panel p2" id="fp2">
+        <div class="fp-name">🔴 ${p2.name}</div>
+        ${p2.imageData?`<img class="fp-img" src="${p2.imageData}" alt="${p2.name}" style="border-color:var(--red)">`:`<div class="fp-emoji">${p2.emoji}</div>`}
+        <div class="fp-hp-bar"><div class="fp-hp-fill" id="hp2bar" style="width:100%;background:var(--red)"></div></div>
+        <div class="fp-hp-text" id="hp2text" style="color:var(--red)">${p2.hp} / ${p2.hp}</div>
+      </div>
+    </div>
+    <div class="battle-log"><h4>⚔️ バトルのながれ</h4><div id="logEntries"></div></div>
+    <div id="battleResult"></div>
+    <div id="battleActions"></div>`;
+  const turns=result.turns||[];
+  const delay=ms=>new Promise(r=>setTimeout(r,ms));
+  async function play(){
+    for(const t of turns){
+      await delay(900);
+      const p1pct=Math.max(0,Math.min(100,(t.p1Hp/p1.hp)*100));
+      const p2pct=Math.max(0,Math.min(100,(t.p2Hp/p2.hp)*100));
+      document.getElementById('hp1bar').style.width=p1pct+'%';
+      document.getElementById('hp2bar').style.width=p2pct+'%';
+      document.getElementById('hp1text').textContent=Math.max(0,t.p1Hp)+' / '+p1.hp;
+      document.getElementById('hp2text').textContent=Math.max(0,t.p2Hp)+' / '+p2.hp;
+      const fp=document.getElementById(t.attacker==='p1'?'fp2':'fp1');
+      if(fp){fp.classList.add('hit-flash');setTimeout(()=>fp.classList.remove('hit-flash'),350);}
+      const entry=document.createElement('div');
+      const isSpec=t.action==='とくぎ';
+      entry.className='log-entry '+(isSpec?'special':t.attacker==='p1'?'atk':'def');
+      entry.innerHTML=`<b>ターン${t.turn}</b> ${t.attacker==='p1'?p1.name:p2.name}の「${t.actionName}」 ✦ ${t.damage}ダメージ！<br><span style="font-size:11px;color:var(--muted)">${t.description}</span>`;
+      const le=document.getElementById('logEntries');
+      le.appendChild(entry);le.scrollTop=le.scrollHeight;
+    }
+    await delay(700);
+    const winner=result.winner==='p1'?p1:p2;
+    const res=document.getElementById('battleResult');
+    res.style.display='block';
+    res.innerHTML=`
+      <div style="margin-bottom:10px">${winner.imageData?`<img src="${winner.imageData}" style="width:64px;height:64px;border-radius:14px;object-fit:cover;border:2px solid var(--gold)">`:`<div style="font-size:52px">${winner.emoji}</div>`}</div>
+      <div class="result-name">🏆 ${winner.name} のかち！</div>
+      <div class="result-sub">${result.finalMessage||''}</div>`;
+    document.getElementById('battleActions').innerHTML=`
+      <button class="btn-primary" style="margin-top:12px" onclick="renderBattleSelect()">🔄 もういちどバトル</button>
+      <button class="btn-secondary" style="margin-top:8px" onclick="showPage('collection')">📖 図鑑にもどる</button>`;
+  }
+  play();
+}
+
+function renderSimpleBattle(p1,p2){
+  const winner=p1.hp*p1.totalAtk>p2.hp*p2.totalAtk?p1:p2;
+  document.getElementById('battleContent').innerHTML=`
+    <div id="battleResult" style="display:block;text-align:center;padding:24px;background:var(--card2);border-radius:16px;border:2px solid var(--gold)">
+      <div style="font-size:52px">${winner.emoji}</div>
+      <div class="result-name" style="margin-top:8px">🏆 ${winner.name} のかち！</div>
+    </div>
+    <button class="btn-primary" style="margin-top:12px" onclick="renderBattleSelect()">🔄 もういちどバトル</button>`;
+}
+
+// ===== AI IMAGE GENERATION (Claude SVG) =====
+async function generateGeminiImage(char){
+  const avatarWrap=document.getElementById('charAvatarWrap');
+  avatarWrap.style.position='relative';
+  const origSrc=char.imageData;
+  avatarWrap.innerHTML=`
+    <img class="char-avatar" src="${origSrc}" alt="キャラ" style="opacity:.3">
+    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;background:rgba(0,0,0,.6);border-radius:14px">
+      <div style="font-size:20px">🎨</div>
+      <div style="font-size:9px;color:var(--green);font-weight:700">AI生成中…</div>
+    </div>`;
+
+  try{
+    const base64=currentImageData.split(',')[1];
+    const mt=currentImageData.split(';')[0].split(':')[1];
+
+    const svgPrompt=`あなたはアニメキャラクターデザイナーです。この手描きキャラクターのスケッチを見て、そのキャラクターを忠実に再現したSVGイラストを作成してください。
+
+要件：
+- 元の絵の特徴（形、シルエット、パーツ）をできるだけ忠実に再現
+- カラフルなアニメ風のキャラクターイラスト
+- SVGサイズは200x200
+- 背景は薄い色のグラデーション
+- キャラクターをカラフルに塗る
+- viewBox="0 0 200 200" を使用
+
+必ずSVGコードのみを返してください。<svg>タグから</svg>タグまでのみ。説明文や\`\`\`は不要。`;
+
+    const res=await callAPI({
+      model:'claude-sonnet-4-6',
+      max_tokens:2000,
+      messages:[{role:'user',content:[
+        {type:'image',source:{type:'base64',media_type:mt,data:base64}},
+        {type:'text',text:svgPrompt}
+      ]}]
+    });
+    const data=await res.json();
+    let svgCode=data.content.map(i=>i.text||'').join('').trim();
+    
+    // Clean up SVG code
+    svgCode=svgCode.replace(/```svg|```xml|```/g,'').trim();
+    if(!svgCode.startsWith('<svg')) {
+      const idx=svgCode.indexOf('<svg');
+      if(idx>=0) svgCode=svgCode.substring(idx);
+    }
+    const endIdx=svgCode.lastIndexOf('</svg>')+6;
+    if(endIdx>5) svgCode=svgCode.substring(0,endIdx);
+
+    // Convert SVG to data URL
+    const svgBlob=new Blob([svgCode],{type:'image/svg+xml'});
+    const svgUrl=URL.createObjectURL(svgBlob);
+    
+    char.aiImageUrl=svgUrl;
+    char.aiSvg=svgCode;
+    avatarWrap.style.position='';
+    avatarWrap.innerHTML=`<img class="char-avatar" src="${svgUrl}" alt="AIキャラ" style="border-color:var(--green)">`;
+    updateInCollection(char);
+
+  }catch(e){
+    console.error('SVG gen error:',e);
+    avatarWrap.style.position='';
+    avatarWrap.innerHTML=origSrc
+      ?`<img class="char-avatar" src="${origSrc}" alt="キャラ">`
+      :`<div class="char-avatar-ph">${char.emoji}</div>`;
+  }
+}
+
+// ===== AI IMAGE VIEWER =====
+function openImgViewer(){
+  if(!currentChar) return;
+  openImgViewerFromCollection(currentChar);
+}
+
+function openImgViewerFromCollection(char){
+  let src=char.aiImageUrl;
+  if(!src && char.aiSvg){
+    const blob=new Blob([char.aiSvg],{type:'image/svg+xml'});
+    src=URL.createObjectURL(blob);
+    char.aiImageUrl=src;
+  }
+  if(!src) return;
+  
+  document.getElementById('modalBody').innerHTML=`
+    <div style="text-align:center">
+      <div style="font-family:'Zen Kurenaido',serif;font-size:18px;color:var(--gold);margin-bottom:12px">${char.emoji} ${char.name}</div>
+      <img src="${src}" alt="AIキャラ" style="width:100%;max-width:300px;border-radius:16px;border:2px solid var(--green);margin-bottom:14px">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">AIがつくったキャラクターイラストです✨</div>
+      <a href="${src}" download="${char.name}.svg" style="display:block;padding:12px;background:linear-gradient(135deg,var(--gold2),var(--gold));color:#1A0A00;border-radius:12px;font-weight:900;font-size:14px;text-decoration:none;margin-bottom:8px">📥 ほぞんする</a>
+    </div>`;
+  document.getElementById('modal').classList.add('show');
+}
+</script>
+</body>
+</html>
