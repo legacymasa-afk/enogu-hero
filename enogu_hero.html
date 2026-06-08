@@ -557,14 +557,40 @@ async function analyzeCharacter(){
   btn.disabled=true; showLoading();
   const base64=currentImageData.split(',')[1];
   const mt=currentImageData.split(';')[0].split(':')[1];
-  const prompt=`あなたはRPGゲームのキャラクタークリエイターです。子供が描いたキャラクター（または絵）の画像を見て、RPGステータスをJSON形式で作ってください。子供がワクワクするような、個性的なキャラクターにしてください。
-必ずこのJSON形式のみで返答してください（コードブロックなし）:
-{"name":"キャラクター名（ひらがな・カタカナ・漢字、8文字以内）","class":"職業（例：まほうつかい、ゆうしゃ、にんじゃ、ドラゴン）","rarity":"SSR|SR|R","hp":数値(100-999),"atk":数値(10-99),"def":数値(10-99),"spd":数値(10-99),"mag":数値(10-99),"luk":数値(10-99),"story":"キャラクターの紹介（ひらがな中心、子供向け、45文字以内）","skill":"とくぎ名（15文字以内）","skillDesc":"とくぎの説明（20文字以内）","emoji":"このキャラに合う絵文字1つ","startingWeapon":{"name":"さいしょのぶき名","emoji":"ぶきの絵文字1つ","atk":数値(5-25),"desc":"ぶきの説明（20文字以内）"}}`;
+  const prompt=`あなたはRPGゲームのキャラクタークリエイターかつSVGアーティストです。子供が描いたキャラクターの画像を見て、以下を作成してください。
+
+1. キャラクターのRPGステータス（JSON）
+2. そのキャラクターを元の絵に忠実に再現したカラフルなアニメ風SVGイラスト（200x200）
+
+必ず以下の形式のみで返答してください（コードブロックなし）:
+
+JSON_START
+{"name":"キャラクター名（8文字以内）","class":"職業","rarity":"SSR|SR|R","hp":数値(100-999),"atk":数値(10-99),"def":数値(10-99),"spd":数値(10-99),"mag":数値(10-99),"luk":数値(10-99),"story":"紹介（45文字以内）","skill":"とくぎ名（15文字以内）","skillDesc":"説明（20文字以内）","emoji":"絵文字1つ","startingWeapon":{"name":"ぶき名","emoji":"絵文字","atk":数値(5-25),"desc":"説明（20文字以内）"}}
+JSON_END
+SVG_START
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+（元の絵のキャラクターをカラフルなアニメ風で忠実に再現。背景はグラデーション。キャラクターの特徴的な形・シルエットを保持。鮮やかな色使い。200x200に収める）
+</svg>
+SVG_END`;
   try {
-    const res=await callAPI({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:mt,data:base64}},{type:'text',text:prompt}]}]});
+    const res=await callAPI({model:'claude-sonnet-4-6',max_tokens:3000,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:mt,data:base64}},{type:'text',text:prompt}]}]});
     const data=await res.json();
     const text=data.content.map(i=>i.text||'').join('');
-    const char=JSON.parse(text.replace(/```json|```/g,'').trim());
+    
+    // Extract JSON
+    const jsonMatch=text.match(/JSON_START\s*([\s\S]*?)\s*JSON_END/);
+    if(!jsonMatch) throw new Error('JSON not found');
+    const char=JSON.parse(jsonMatch[1].trim());
+    
+    // Extract SVG
+    const svgMatch=text.match(/SVG_START\s*([\s\S]*?)\s*SVG_END/);
+    if(svgMatch){
+      const svgCode=svgMatch[1].trim();
+      const svgBlob=new Blob([svgCode],{type:'image/svg+xml'});
+      char.aiImageUrl=URL.createObjectURL(svgBlob);
+      char.aiSvg=svgCode;
+    }
+    
     char.imageData=currentImageData;
     char.weapons=[char.startingWeapon];
     char.id=Date.now().toString();
@@ -575,7 +601,7 @@ async function analyzeCharacter(){
     btn.textContent='🔄 もういちどつくる';
     document.getElementById('charCard').style.display='block';
     document.getElementById('screen').scrollTo({top:300,behavior:'smooth'});
-    generateGeminiImage(char);
+    // No separate image generation needed - already done!
   } catch(e){
     hideLoading();btn.disabled=false;
     if(e.message==='no key') return;
@@ -592,8 +618,13 @@ async function analyzeCharacter(){
 function renderCharCard(char){
   const dispSrc=char.aiImageUrl||char.imageData;
   document.getElementById('charAvatarWrap').style.position='';
-  document.getElementById('charAvatarWrap').innerHTML=dispSrc
-    ?`<img class="char-avatar" src="${dispSrc}" alt="キャラ">`
+  if(char.aiSvg && !char.aiImageUrl){
+    const svgBlob=new Blob([char.aiSvg],{type:'image/svg+xml'});
+    char.aiImageUrl=URL.createObjectURL(svgBlob);
+  }
+  const finalSrc=char.aiImageUrl||char.imageData;
+  document.getElementById('charAvatarWrap').innerHTML=finalSrc
+    ?`<img class="char-avatar" src="${finalSrc}" alt="キャラ">`
     :`<div class="char-avatar-ph">${char.emoji}</div>`;
   document.getElementById('charName').textContent=char.emoji+' '+char.name;
   document.getElementById('charSub').textContent='【'+char.class+'】 ✨'+char.skill;
@@ -687,8 +718,11 @@ function saveAndGoCollection(){
   showPage('collection');
 }
 function updateInCollection(char){
-  const idx=collection.findIndex(c=>c.id===char.id);
-  if(idx>=0) collection[idx]=char; else collection.unshift(char);
+  // Save a copy without blob URLs (they don't persist)
+  const toSave={...char};
+  if(toSave.aiImageUrl && toSave.aiImageUrl.startsWith('blob:')) delete toSave.aiImageUrl;
+  const idx=collection.findIndex(c=>c.id===toSave.id);
+  if(idx>=0) collection[idx]=toSave; else collection.unshift(toSave);
   if(collection.length>30) collection=collection.slice(0,30);
   localStorage.setItem('heroV2',JSON.stringify(collection));
 }
