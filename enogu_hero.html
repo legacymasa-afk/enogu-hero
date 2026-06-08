@@ -591,6 +591,7 @@ async function analyzeCharacter(){
 // ===== RENDER CHAR CARD =====
 function renderCharCard(char){
   const dispSrc=char.aiImageUrl||char.imageData;
+  document.getElementById('charAvatarWrap').style.position='';
   document.getElementById('charAvatarWrap').innerHTML=dispSrc
     ?`<img class="char-avatar" src="${dispSrc}" alt="キャラ">`
     :`<div class="char-avatar-ph">${char.emoji}</div>`;
@@ -854,37 +855,77 @@ function renderSimpleBattle(p1,p2){
 // ===== AI IMAGE GENERATION =====
 async function generateGeminiImage(char){
   const avatarWrap=document.getElementById('charAvatarWrap');
-  avatarWrap.innerHTML=`<div class="char-avatar-ph">${char.emoji}<br><span style="font-size:10px;color:var(--muted)">🎨 絵をかいせきちゅう…</span></div>`;
+  // Show loading state but keep original image visible underneath
+  const origImg=char.imageData?`<img class="char-avatar" src="${char.imageData}" alt="キャラ" style="opacity:.4">`:
+    `<div class="char-avatar-ph" style="opacity:.4">${char.emoji}</div>`;
+  avatarWrap.innerHTML=origImg+`<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--green);font-weight:700;text-align:center;background:rgba(0,0,0,.5);border-radius:14px">🎨<br>AI生成中</div>`;
+  avatarWrap.style.position='relative';
+
   try{
-    // Step1: Claude describes the drawing faithfully
     const base64=currentImageData.split(',')[1];
     const mt=currentImageData.split(';')[0].split(':')[1];
-    const descPrompt=`You are an anime character designer. Look at this child's hand-drawn character sketch carefully. Your job is to write an English image generation prompt that transforms this sketch into a beautiful anime/manga RPG game character illustration. Keep the same character concept, shape, and key features from the drawing, but reimagine it as a polished anime character. Describe: the character's body shape and pose, face features, hair style and color, outfit/armor/costume, any weapons or accessories, special features or unique traits. Make it colorful, exciting and faithful to the original sketch's concept. End the prompt with: anime style, manga illustration, colorful RPG game character, vibrant colors, clean white background, full body shot, high quality digital art, child-friendly, detailed. Return ONLY the image generation prompt, no other text.`;
-    const res=await callAPI({model:'claude-sonnet-4-6',max_tokens:300,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:mt,data:base64}},{type:'text',text:descPrompt}]}]});
-    const data=await res.json();
-    const description=data.content.map(i=>i.text||'').join('').trim();
-    const ph=avatarWrap.querySelector('span');
-    if(ph) ph.textContent='🎨 カラーキャラをせいせいちゅう…';
+
+    // Ask Claude to describe the drawing in extreme detail
+    const descRes=await callAPI({
+      model:'claude-sonnet-4-6',
+      max_tokens:500,
+      messages:[{role:'user',content:[
+        {type:'image',source:{type:'base64',media_type:mt,data:base64}},
+        {type:'text',text:`You are an expert anime character designer. Study this hand-drawn sketch VERY carefully.
+
+Describe EXACTLY what you see to recreate it as anime art:
+1. Overall body shape and silhouette (round? tall? wide?)
+2. Head shape and facial features (eyes, mouth, any mask/face details)
+3. Hair or head decorations (spikes, petals, horns, etc)
+4. Arms and hands (long? short? how many? any claws/weapons?)
+5. Body/torso shape
+6. Legs and feet
+7. Any weapons, tools or accessories
+8. Special/unique features that make this character distinctive
+
+Then write ONE image generation prompt in English that will recreate this character faithfully as a colorful anime RPG character. The prompt must preserve the unique silhouette and key features of the original sketch.
+
+Format: Return ONLY the image prompt. Start with the most distinctive features. End with: anime style, colorful RPG game character art, vibrant colors, clean white background, full body, high quality digital illustration`}
+      ]}]
+    });
+    const descData=await descRes.json();
+    const description=descData.content.map(i=>i.text||'').join('').trim();
+
+    // Generate image
     const seed=Math.floor(Math.random()*99999);
-    const url=`https://image.pollinations.ai/prompt/${encodeURIComponent(description)}?width=512&height=512&seed=${seed}&model=flux&nologo=true`;
+    const url=`https://image.pollinations.ai/prompt/${encodeURIComponent(description)}?width=512&height=512&seed=${seed}&model=flux&nologo=true&enhance=true`;
+
+    // Create image element and keep it persistent
     const imgEl=document.createElement('img');
     imgEl.className='char-avatar';
     imgEl.style.borderColor='var(--green)';
     imgEl.alt='AIキャラ';
+
     imgEl.onload=function(){
+      // Store URL so it persists
       char.aiImageUrl=url;
+      avatarWrap.style.position='';
       avatarWrap.innerHTML='';
       avatarWrap.appendChild(imgEl);
+      // Save to collection with the URL
       updateInCollection(char);
     };
     imgEl.onerror=function(){
-      avatarWrap.innerHTML=char.imageData?`<img class="char-avatar" src="${char.imageData}" alt="キャラ">`:`<div class="char-avatar-ph">${char.emoji}</div>`;
+      avatarWrap.style.position='';
+      avatarWrap.innerHTML=char.imageData
+        ?`<img class="char-avatar" src="${char.imageData}" alt="キャラ">`
+        :`<div class="char-avatar-ph">${char.emoji}</div>`;
     };
-    avatarWrap.innerHTML='';
-    avatarWrap.appendChild(imgEl);
+
+    // Set src AFTER event handlers
     imgEl.src=url;
+
   }catch(e){
-    avatarWrap.innerHTML=char.imageData?`<img class="char-avatar" src="${char.imageData}" alt="キャラ">`:`<div class="char-avatar-ph">${char.emoji}</div>`;
+    console.error('Image gen error:',e);
+    avatarWrap.style.position='';
+    avatarWrap.innerHTML=char.imageData
+      ?`<img class="char-avatar" src="${char.imageData}" alt="キャラ">`
+      :`<div class="char-avatar-ph">${char.emoji}</div>`;
   }
 }
 </script>
