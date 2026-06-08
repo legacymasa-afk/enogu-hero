@@ -966,6 +966,31 @@ async function generateGeminiImage(char){
       :`<div class="char-avatar-ph">${char.emoji}</div>`;
   }
 }
+
+// ===== AI IMAGE VIEWER =====
+function openImgViewer(){
+  if(!currentChar) return;
+  openImgViewerFromCollection(currentChar);
+}
+
+function openImgViewerFromCollection(char){
+  let src=char.aiImageUrl;
+  if(!src && char.aiSvg){
+    const blob=new Blob([char.aiSvg],{type:'image/svg+xml'});
+    src=URL.createObjectURL(blob);
+    char.aiImageUrl=src;
+  }
+  if(!src) return;
+  
+  document.getElementById('modalBody').innerHTML=`
+    <div style="text-align:center">
+      <div style="font-family:'Zen Kurenaido',serif;font-size:18px;color:var(--gold);margin-bottom:12px">${char.emoji} ${char.name}</div>
+      <img src="${src}" alt="AIキャラ" style="width:100%;max-width:300px;border-radius:16px;border:2px solid var(--green);margin-bottom:14px">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">AIがつくったキャラクターイラストです✨</div>
+      <a href="${src}" download="${char.name}.svg" style="display:block;padding:12px;background:linear-gradient(135deg,var(--gold2),var(--gold));color:#1A0A00;border-radius:12px;font-weight:900;font-size:14px;text-decoration:none;margin-bottom:8px">📥 ほぞんする</a>
+    </div>`;
+  document.getElementById('modal').classList.add('show');
+}
 </script>
 </body>
 </html>
