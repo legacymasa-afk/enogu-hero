@@ -629,9 +629,9 @@ SVG_END`;
 
 // ===== RENDER CHAR CARD =====
 function renderCharCard(char){
-  const dispSrc=char.aiImageUrl||char.imageData;
   document.getElementById('charAvatarWrap').style.position='';
-  if(char.aiSvg && !char.aiImageUrl){
+  // Rebuild blob URL from saved SVG string
+  if(char.aiSvg){
     const svgBlob=new Blob([char.aiSvg],{type:'image/svg+xml'});
     char.aiImageUrl=URL.createObjectURL(svgBlob);
   }
@@ -731,13 +731,25 @@ function saveAndGoCollection(){
   showPage('collection');
 }
 function updateInCollection(char){
-  // Save a copy without blob URLs (they don't persist)
-  const toSave={...char};
+  // Save SVG string (not blob URL which is temporary)
+  const toSave=JSON.parse(JSON.stringify(char));
   if(toSave.aiImageUrl && toSave.aiImageUrl.startsWith('blob:')) delete toSave.aiImageUrl;
+  // aiSvg is already saved as string - good
   const idx=collection.findIndex(c=>c.id===toSave.id);
   if(idx>=0) collection[idx]=toSave; else collection.unshift(toSave);
   if(collection.length>30) collection=collection.slice(0,30);
-  localStorage.setItem('heroV2',JSON.stringify(collection));
+  try{localStorage.setItem('heroV2',JSON.stringify(collection));}
+  catch(e){
+    // If storage full, remove imageData (large) and retry
+    collection.forEach(c=>{if(c.imageData && c.imageData.length>10000) delete c.imageData;});
+    try{localStorage.setItem('heroV2',JSON.stringify(collection));}catch(e2){console.warn('Storage full');}
+  }
+}
+
+function getSvgUrl(char){
+  if(!char.aiSvg) return null;
+  const blob=new Blob([char.aiSvg],{type:'image/svg+xml'});
+  return URL.createObjectURL(blob);
 }
 function renderCollection(){
   const el=document.getElementById('collContent');
@@ -747,7 +759,7 @@ function renderCollection(){
   el.innerHTML=`<div class="coll-grid">${collection.map((c,i)=>`
     <div class="coll-card" onclick="loadCharFromCollection(${i})">
       <span class="cc-rarity tag tag-${c.rarity.toLowerCase()}">${c.rarity}</span>
-      ${c.imageData?`<img class="cc-img" src="${c.imageData}" alt="${c.name}">`:`<div class="cc-emoji">${c.emoji||'❓'}</div>`}
+      ${(()=>{if(c.aiSvg){const b=new Blob([c.aiSvg],{type:'image/svg+xml'});return `<img class="cc-img" src="${URL.createObjectURL(b)}" alt="${c.name}">`;}if(c.imageData) return `<img class="cc-img" src="${c.imageData}" alt="${c.name}">`;return `<div class="cc-emoji">${c.emoji||'❓'}</div>`;})()}
       <div class="cc-name">${c.name}</div>
       <div class="cc-info">${c.class} / ${(c.weapons||[]).length}ぶき</div>
       ${(c.aiImageUrl||c.aiSvg)?`<button class="coll-card-img-btn" onclick="event.stopPropagation();openImgViewerFromCollection(collection[${i}])">🖼️</button>`:''}
@@ -786,7 +798,7 @@ function renderBattleSelect(){
 }
 function pickCard(p,c,i){
   return `<div class="battle-pick-card" id="pick-${p}-${i}" onclick="selectFighter(${p},${i})">
-    ${c.imageData?`<img class="bpc-img" src="${c.imageData}" alt="${c.name}">`:`<div class="bpc-emoji">${c.emoji||'❓'}</div>`}
+    ${(()=>{if(c.aiSvg){const b=new Blob([c.aiSvg],{type:'image/svg+xml'});return `<img class="bpc-img" src="${URL.createObjectURL(b)}" alt="${c.name}">`;}if(c.imageData) return `<img class="bpc-img" src="${c.imageData}" alt="${c.name}">`;return `<div class="bpc-emoji">${c.emoji||'❓'}</div>`;})()}
     <div class="bpc-name">${c.name}</div><div class="bpc-class">${c.class}</div></div>`;
 }
 function selectFighter(player,idx){
