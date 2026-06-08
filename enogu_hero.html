@@ -581,7 +581,7 @@ async function analyzeCharacter(){
     btn.textContent='🔄 もういちどつくる';
     document.getElementById('charCard').style.display='block';
     document.getElementById('screen').scrollTo({top:300,behavior:'smooth'});
-    if(GEMINI_KEY) generateGeminiImage(char);
+    generateGeminiImage(char);
   } catch(e){
     hideLoading();btn.disabled=false;
     if(e.message==='no key') return;
@@ -856,38 +856,38 @@ function renderSimpleBattle(p1,p2){
     <button class="btn-primary" style="margin-top:12px" onclick="renderBattleSelect()">🔄 もういちどバトル</button>`;
 }
 
-// ===== GEMINI IMAGE GENERATION =====
+// ===== AI IMAGE GENERATION (Pollinations - no API key needed) =====
 async function generateGeminiImage(char){
-  if(!GEMINI_KEY) return;
   const avatarWrap=document.getElementById('charAvatarWrap');
-  avatarWrap.innerHTML=`<div class="char-avatar-ph" style="animation:pulse 1s infinite">${char.emoji}<br><span style="font-size:10px;color:var(--muted)">AI生成中…</span></div>`;
-  const prompt=`A colorful RPG game character illustration. Character name: ${char.name}, class: ${char.class}. The character has these traits: ${char.story}. Style: cute anime/manga RPG character, full body, vibrant colors, white background, game art style, child-friendly. The character should look powerful and unique.`;
+  avatarWrap.innerHTML=`<div class="char-avatar-ph">${char.emoji}<br><span style="font-size:10px;color:var(--muted)">🎨 AI生成中…</span></div>`;
+  const prompt=encodeURIComponent(`cute anime RPG character, ${char.name}, ${char.class}, ${char.story}, colorful, full body, white background, game art style, child-friendly illustration, vibrant colors, detailed`);
+  const seed=Math.floor(Math.random()*99999);
+  const url=`https://image.pollinations.ai/prompt/${prompt}?width=512&height=512&seed=${seed}&model=flux&nologo=true`;
   try{
-    // Try imagen-3.0-generate-002 for image generation
-    const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${GEMINI_KEY}`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        instances:[{prompt:prompt}],
-        parameters:{sampleCount:1,aspectRatio:'1:1'}
-      })
-    });
-    const data=await res.json();
-    const imgData=data?.predictions?.[0]?.bytesBase64Encoded;
-    const mimeType=data?.predictions?.[0]?.mimeType||'image/png';
-    if(imgData){
-      const imgSrc='data:'+mimeType+';base64,'+imgData;
-      char.imageData=imgSrc;
-      char.geminiImage=imgSrc;
-      avatarWrap.innerHTML=`<img class="char-avatar" src="${imgSrc}" alt="AIキャラ" style="border-color:var(--green)">`;
-      updateInCollection(char);
-    } else {
-      console.warn('Gemini image generation response:', JSON.stringify(data));
+    const img=new Image();
+    img.crossOrigin='anonymous';
+    img.onload=function(){
+      try{
+        const canvas=document.createElement('canvas');
+        canvas.width=512;canvas.height=512;
+        canvas.getContext('2d').drawImage(img,0,0,512,512);
+        const imgSrc=canvas.toDataURL('image/jpeg',0.85);
+        char.imageData=imgSrc;
+        avatarWrap.innerHTML=`<img class="char-avatar" src="${imgSrc}" alt="AIキャラ" style="border-color:var(--green)">`;
+        updateInCollection(char);
+      }catch(e){
+        // CORS fallback - just show the URL directly
+        char.imageData=url;
+        avatarWrap.innerHTML=`<img class="char-avatar" src="${url}" alt="AIキャラ" style="border-color:var(--green)">`;
+        updateInCollection(char);
+      }
+    };
+    img.onerror=function(){
       avatarWrap.innerHTML=char.imageData?`<img class="char-avatar" src="${char.imageData}" alt="キャラ">`:`<div class="char-avatar-ph">${char.emoji}</div>`;
-    }
+    };
+    img.src=url;
   }catch(e){
-    console.error('Gemini error:',e);
-    avatarWrap.innerHTML=char.imageData?`<img class="char-avatar" src="${char.imageData}" alt="キャラ">`:`<div class="char-avatar-ph">${char.emoji}</div>`;
+    avatarWrap.innerHTML=`<div class="char-avatar-ph">${char.emoji}</div>`;
   }
 }
 </script>
