@@ -855,76 +855,54 @@ function renderSimpleBattle(p1,p2){
 // ===== AI IMAGE GENERATION =====
 async function generateGeminiImage(char){
   const avatarWrap=document.getElementById('charAvatarWrap');
-  // Show loading state but keep original image visible underneath
-  const origImg=char.imageData?`<img class="char-avatar" src="${char.imageData}" alt="キャラ" style="opacity:.4">`:
-    `<div class="char-avatar-ph" style="opacity:.4">${char.emoji}</div>`;
-  avatarWrap.innerHTML=origImg+`<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--green);font-weight:700;text-align:center;background:rgba(0,0,0,.5);border-radius:14px">🎨<br>AI生成中</div>`;
   avatarWrap.style.position='relative';
+  const origSrc=char.imageData;
+  avatarWrap.innerHTML=`
+    <img class="char-avatar" src="${origSrc}" alt="キャラ" style="opacity:.3">
+    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;background:rgba(0,0,0,.5);border-radius:14px">
+      <div style="font-size:18px">🎨</div>
+      <div style="font-size:9px;color:var(--green);font-weight:700;text-align:center">AI生成中…</div>
+    </div>`;
 
   try{
     const base64=currentImageData.split(',')[1];
     const mt=currentImageData.split(';')[0].split(':')[1];
 
-    // Ask Claude to describe the drawing in extreme detail
+    // Get description from Claude
     const descRes=await callAPI({
       model:'claude-sonnet-4-6',
-      max_tokens:500,
+      max_tokens:400,
       messages:[{role:'user',content:[
         {type:'image',source:{type:'base64',media_type:mt,data:base64}},
-        {type:'text',text:`You are an expert anime character designer. Study this hand-drawn sketch VERY carefully.
-
-Describe EXACTLY what you see to recreate it as anime art:
-1. Overall body shape and silhouette (round? tall? wide?)
-2. Head shape and facial features (eyes, mouth, any mask/face details)
-3. Hair or head decorations (spikes, petals, horns, etc)
-4. Arms and hands (long? short? how many? any claws/weapons?)
-5. Body/torso shape
-6. Legs and feet
-7. Any weapons, tools or accessories
-8. Special/unique features that make this character distinctive
-
-Then write ONE image generation prompt in English that will recreate this character faithfully as a colorful anime RPG character. The prompt must preserve the unique silhouette and key features of the original sketch.
-
-Format: Return ONLY the image prompt. Start with the most distinctive features. End with: anime style, colorful RPG game character art, vibrant colors, clean white background, full body, high quality digital illustration`}
+        {type:'text',text:`Describe this hand-drawn character sketch to recreate it as anime art. Be specific about: body shape, head/face features, hair/head decorations, arms and weapons, legs, any unique traits. Write ONE image generation prompt in English. End with: anime style, colorful RPG game character, vibrant colors, white background, full body, digital illustration. Return ONLY the prompt.`}
       ]}]
     });
     const descData=await descRes.json();
     const description=descData.content.map(i=>i.text||'').join('').trim();
 
-    // Generate image
+    // Try multiple image sources
     const seed=Math.floor(Math.random()*99999);
-    const url=`https://image.pollinations.ai/prompt/${encodeURIComponent(description)}?width=512&height=512&seed=${seed}&model=flux&nologo=true&enhance=true`;
+    const encodedPrompt=encodeURIComponent(description);
+    
+    // Use a reliable image URL
+    const url=`https://image.pollinations.ai/prompt/${encodedPrompt}?width=400&height=400&seed=${seed}&nologo=true`;
 
-    // Create image element and keep it persistent
-    const imgEl=document.createElement('img');
-    imgEl.className='char-avatar';
-    imgEl.style.borderColor='var(--green)';
-    imgEl.alt='AIキャラ';
-
-    imgEl.onload=function(){
-      // Store URL so it persists
-      char.aiImageUrl=url;
-      avatarWrap.style.position='';
-      avatarWrap.innerHTML='';
-      avatarWrap.appendChild(imgEl);
-      // Save to collection with the URL
-      updateInCollection(char);
-    };
-    imgEl.onerror=function(){
-      avatarWrap.style.position='';
-      avatarWrap.innerHTML=char.imageData
-        ?`<img class="char-avatar" src="${char.imageData}" alt="キャラ">`
-        :`<div class="char-avatar-ph">${char.emoji}</div>`;
-    };
-
-    // Set src AFTER event handlers
-    imgEl.src=url;
+    // Fetch as blob to avoid CORS/caching issues
+    const imgRes = await fetch(url);
+    if(!imgRes.ok) throw new Error('fetch failed');
+    const blob = await imgRes.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    
+    char.aiImageUrl = blobUrl;
+    avatarWrap.style.position='';
+    avatarWrap.innerHTML=`<img class="char-avatar" src="${blobUrl}" alt="AIキャラ" style="border-color:var(--green)">`;
+    updateInCollection(char);
 
   }catch(e){
     console.error('Image gen error:',e);
     avatarWrap.style.position='';
-    avatarWrap.innerHTML=char.imageData
-      ?`<img class="char-avatar" src="${char.imageData}" alt="キャラ">`
+    avatarWrap.innerHTML=origSrc
+      ?`<img class="char-avatar" src="${origSrc}" alt="キャラ">`
       :`<div class="char-avatar-ph">${char.emoji}</div>`;
   }
 }
